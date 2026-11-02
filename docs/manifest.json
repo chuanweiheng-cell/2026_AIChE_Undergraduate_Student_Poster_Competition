@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "dimensional": {
+    "file": "dimensional.bin.gz",
+    "fields": [
+      {
+        "name": "log_da",
+        "type": "<f8",
+        "length": 151,
+        "offset": 0
+      },
+      {
+        "name": "gamma",
+        "type": "<f8",
+        "length": 26,
+        "offset": 1208
+      },
+      {
+        "name": "offsets",
+        "type": "<u4",
+        "length": 3927,
+        "offset": 1416
+      },
+      {
+        "name": "x",
+        "type": "<f8",
+        "length": 3261892,
+        "offset": 17128
+      },
+      {
+        "name": "cH",
+        "type": "<f4",
+        "length": 3261892,
+        "offset": 26112264
+      },
+      {
+        "name": "cNa",
+        "type": "<f4",
+        "length": 3261892,
+        "offset": 39159832
+      },
+      {
+        "name": "cOH",
+        "type": "<f4",
+        "length": 3261892,
+        "offset": 52207400
+      },
+      {
+        "name": "peak",
+        "type": "<f8",
+        "length": 3926,
+        "offset": 65254968
+      }
+    ],
+    "uncompressed_bytes": 65286376,
+    "count": 3926,
+    "relative_diffusivities": [
+      1.0,
+      0.14285714285714285,
+      0.5660580021482278,
+      0.21804511278195485
+    ],
+    "model_signature": "808082ae5445e6d6115fc6afa53e43c5511331d8d321689e2cec29a74f787d80"
+  },
+  "da": {
+    "file": "da.bin.gz",
+    "fields": [
+      {
+        "name": "log_da",
+        "type": "<f8",
+        "length": 321,
+        "offset": 0
+      },
+      {
+        "name": "offsets",
+        "type": "<u4",
+        "length": 322,
+        "offset": 2568
+      },
+      {
+        "name": "x",
+        "type": "<f8",
+        "length": 199442,
+        "offset": 3856
+      },
+      {
+        "name": "cH",
+        "type": "<f4",
+        "length": 199442,
+        "offset": 1599392
+      },
+      {
+        "name": "cNa",
+        "type": "<f4",
+        "length": 199442,
+        "offset": 2397160
+      },
+      {
+        "name": "cOH",
+        "type": "<f4",
+        "length": 199442,
+        "offset": 3194928
+      },
+      {
+        "name": "cCl",
+        "type": "<f4",
+        "length": 199442,
+        "offset": 3992696
+      }
+    ],
+    "uncompressed_bytes": 4790464,
+    "count": 321,
+    "salt_ratio": 0.2,
+    "model_signature": "1398b618a896ed975c98855ad71342e04a422876d03658b7f04cb232fe0edfbf"
+  }
+}

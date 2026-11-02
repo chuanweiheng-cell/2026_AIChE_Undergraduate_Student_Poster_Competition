@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#193848">
+  <meta name="description" content="Interactive electroneutral Nernst–Planck ion transport illustrations from precomputed numerical BVP solutions.">
+  <title>Ion Transport | Interactive ENNP</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="top-inner">
+      <div class="brand-dot" aria-hidden="true"></div>
+      <div><div class="eyebrow">ELECTRONEUTRAL NERNST–PLANCK</div><h1>Interactive Ion Transport</h1></div>
+      <div class="top-tag">RESEARCH DEMONSTRATION</div>
+    </div>
+  </header>
+  <main>
+    <div class="intro">
+      <div>
+        <h2>Concentration &amp; reaction profiles</h2>
+        <p>Explore how diffusion, reaction, domain length, and reservoir concentrations influence a steady acid–base reaction front.</p>
+      </div>
+      <div id="load-status" class="load-status" role="status" aria-live="polite">Loading numerical profiles…</div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Select model interface">
+      <button type="button" role="tab" class="tab active" id="tab-dimensional" aria-selected="true" aria-controls="panel-dimensional" data-view="dimensional">Dimensional · Five sliders</button>
+      <button type="button" role="tab" class="tab" id="tab-da" aria-selected="false" aria-controls="panel-da" data-view="da">Nondimensional · Da only</button>
+    </div>
+
+    <div id="panel-dimensional" class="panel active" role="tabpanel" aria-labelledby="tab-dimensional">
+      <section class="controls" aria-label="Dimensional model controls">
+        <div class="section-title">Physical parameters</div>
+        <div class="control"><div class="control-top"><label for="c0">Reservoir concentration <i>c</i>₀</label><output id="c0-value">1.00 mol/m³</output></div><input type="range" id="c0" min="0.05" max="2" step="0.01" value="1"></div>
+        <div class="control"><div class="control-top"><label for="cs">Salt concentration <i>c</i>ₛ</label><output id="cs-value">0.20 mol/m³</output></div><input type="range" id="cs" min="0.05" max="2" step="0.01" value="0.2"></div>
+        <div class="control"><div class="control-top"><label for="logL">Domain length <i>L</i></label><output id="logL-value">500 μm</output></div><input type="range" id="logL" min="-9" max="0" step="0.05" value="-3.30"><div class="endpoints"><span>1 nm</span><span>1 m</span></div></div>
+        <div class="control"><div class="control-top"><label for="logk">Reaction constant <i>k</i></label><output id="logk-value">1.00 × 10⁴</output></div><input type="range" id="logk" min="-12.25" max="10" step="0.25" value="4"><div class="endpoints"><span>0</span><span>10¹⁰ m³/(mol·s)</span></div></div>
+        <div class="control"><div class="control-top"><label for="logD">Characteristic diffusivity <i>D</i><sub>*</sub></label><output id="logD-value">9.33 × 10⁻⁹ m²/s</output></div><input type="range" id="logD" min="-9" max="-1" step="0.05" value="-8.03"><div class="endpoints"><span>10⁻⁹</span><span>10⁻¹ m²/s</span></div></div>
+        <button type="button" class="reset-btn" id="reset-dimensional">Reset dimensional values</button>
+        <div class="method-notes">Smooth preview based on precomputed BVP solutions. The relative species diffusivities remain fixed as <i>D</i><sub>*</sub> changes.</div>
+      </section>
+      <section class="charts" aria-label="Dimensional plots">
+        <div class="statrow"><div><span class="stat-label">Damköhler number</span><strong id="stat-da">—</strong></div><div><span class="stat-label">Salt ratio cₛ/c₀</span><strong id="stat-gamma">—</strong></div><div><span class="stat-label">Reaction front</span><strong id="stat-peak">—</strong></div></div>
+        <div class="chart"><div class="chart-heading"><h3>Ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div><canvas id="dim-concentration" aria-label="Dimensional concentration curves"></canvas></div>
+        <div class="chart"><div class="chart-heading"><h3>Volumetric reaction rate</h3><span class="reaction-legend"><i class="swatch magenta"></i>R = kcₕcₒₕ</span></div><canvas id="dim-reaction" aria-label="Dimensional reaction-rate curve"></canvas></div>
+      </section>
+    </div>
+
+    <div id="panel-da" class="panel" role="tabpanel" aria-labelledby="tab-da" hidden>
+      <section class="controls" aria-label="Damköhler-only controls">
+        <div class="section-title">Nondimensional parameter</div>
+        <div class="control"><div class="control-top"><label for="logDa">Damköhler number <i>Da</i></label><output id="logDa-value">100</output></div><input type="range" id="logDa" min="-6" max="10" step="0.05" value="2"><div class="endpoints"><span>10⁻⁶</span><span>10¹⁰</span></div></div>
+        <button type="button" class="reset-btn" id="reset-da">Reset Da</button>
+        <div class="method-notes">Each slider position retrieves an individually solved BVP profile. All other nondimensional parameters are held fixed.</div>
+      </section>
+      <section class="charts" aria-label="Nondimensional plots">
+        <div class="statrow"><div><span class="stat-label">Damköhler number</span><strong id="stat-da-only">—</strong></div><div><span class="stat-label">Salt ratio cₛ/c₀</span><strong>0.2</strong></div><div><span class="stat-label">Reaction front</span><strong id="stat-da-peak">—</strong></div></div>
+        <div class="chart"><div class="chart-heading"><h3>Dimensionless ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div><canvas id="da-concentration" aria-label="Nondimensional concentration curves"></canvas></div>
+        <div class="chart"><div class="chart-heading"><h3>Dimensionless reaction rate</h3><span class="reaction-legend"><i class="swatch magenta"></i>R̂ = Da ĈₕĈₒₕ</span></div><canvas id="da-reaction" aria-label="Nondimensional reaction-rate curve"></canvas></div>
+      </section>
+    </div>
+
+    <footer><span>Steady, 1D, zero-current electroneutral transport · Educational illustration</span><span>Precomputed with SciPy; rendered in your browser</span></footer>
+  </main>
+</body>
+</html>
