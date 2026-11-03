@@ -2,92 +2,166 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#193848">
-  <meta name="description" content="Interactive electroneutral Nernst–Planck ion transport illustrations from precomputed numerical BVP solutions.">
-  <title>Ion Transport | Interactive ENNP</title>
-  <link rel="stylesheet" href="styles.css?v=flux-mobile-1">
-  <script src="app.js?v=flux-mobile-1" defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173447">
+  <meta name="description" content="Interactive electroneutral Nernst–Planck ion transport: concentrations, fluxes, and reaction fronts from precomputed SciPy BVP solutions.">
+  <title>Interactive Ion Transport · AIChE 2026</title>
+  <!-- Versioned URLs avoid Safari and GitHub Pages serving outdated styles/scripts. -->
+  <link rel="stylesheet" href="styles.css?v=dashboard-2">
+  <script src="app.js?v=dashboard-2" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="top-inner">
-      <div class="brand-dot" aria-hidden="true"></div>
-      <div><div class="eyebrow">ELECTRONEUTRAL NERNST–PLANCK</div><h1>Interactive Ion Transport</h1></div>
-      <div class="top-tag">RESEARCH DEMONSTRATION</div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-name">
+        <span class="brand-eyebrow">AIChE 2026 · SCIENTIFIC INTERACTIVE</span>
+        <h1>Ion Transport Lab</h1>
+      </div>
+      <div class="header-note">STEADY · 1D · ELECTRONEUTRAL</div>
     </div>
   </header>
-  <main>
-    <div class="intro">
+
+  <main class="page-wrap">
+    <div class="page-intro">
       <div>
-        <h2>Concentration, flux &amp; reaction profiles</h2>
-        <p>Explore concentrations, signed molar fluxes, and the reaction front in steady acid–base ion transport. All three plots are driven by the same numerical solution.</p>
+        <h2>Explore ion transport &amp; reaction</h2>
+        <p>Adjust the physical parameters to see how concentration, species flux, and neutralization respond.</p>
       </div>
       <div id="load-status" class="load-status" role="status" aria-live="polite">Loading numerical profiles…</div>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="Select model interface">
-      <button type="button" role="tab" class="tab active" id="tab-dimensional" aria-selected="true" aria-controls="panel-dimensional" data-view="dimensional">Dimensional · Five sliders</button>
-      <button type="button" role="tab" class="tab" id="tab-da" aria-selected="false" aria-controls="panel-da" data-view="da">Nondimensional · Da only</button>
-    </div>
+    <nav class="mode-tabs" role="tablist" aria-label="Choose the numerical demonstration">
+      <button type="button" role="tab" id="tab-dimensional" class="mode-tab active" aria-selected="true" aria-controls="panel-dimensional" data-view="dimensional">Five physical parameters</button>
+      <button type="button" role="tab" id="tab-da" class="mode-tab" aria-selected="false" aria-controls="panel-da" data-view="da">Damköhler number only</button>
+    </nav>
 
+    <!-- DIMENSIONAL: all data IDs deliberately retained from the working site. -->
     <div id="panel-dimensional" class="panel active" role="tabpanel" aria-labelledby="tab-dimensional">
-      <section class="controls" aria-label="Dimensional model controls">
-        <div class="section-title">Physical parameters <span class="section-subtitle">Drag to explore</span></div>
-        <button type="button" class="controls-toggle" aria-expanded="true">Hide sliders</button>
-        <div class="control"><div class="control-top"><label for="c0">Reservoir concentration <i>c</i>₀</label><output id="c0-value">1.00 mol/m³</output></div><input type="range" id="c0" min="0.05" max="2" step="0.01" value="1"></div>
-        <div class="control"><div class="control-top"><label for="cs">Salt concentration <i>c</i>ₛ</label><output id="cs-value">0.20 mol/m³</output></div><input type="range" id="cs" min="0.05" max="2" step="0.01" value="0.2"></div>
-        <div class="control"><div class="control-top"><label for="logL">Domain length <i>L</i></label><output id="logL-value">500 μm</output></div><input type="range" id="logL" min="-9" max="0" step="0.05" value="-3.30"><div class="endpoints"><span>1 nm</span><span>1 m</span></div></div>
-        <div class="control"><div class="control-top"><label for="logk">Reaction constant <i>k</i></label><output id="logk-value">1.00 × 10⁴</output></div><input type="range" id="logk" min="-12.25" max="10" step="0.25" value="4"><div class="endpoints"><span>0</span><span>10¹⁰ m³/(mol·s)</span></div></div>
-        <div class="control"><div class="control-top"><label for="logD">Characteristic diffusivity <i>D</i><sub>*</sub></label><output id="logD-value">9.33 × 10⁻⁹ m²/s</output></div><input type="range" id="logD" min="-9" max="-1" step="0.05" value="-8.03"><div class="endpoints"><span>10⁻⁹</span><span>10⁻¹ m²/s</span></div></div>
-        <button type="button" class="reset-btn" id="reset-dimensional">Reset dimensional values</button>
-        <div class="method-notes">Smooth preview based on precomputed BVP solutions. Fluxes are reconstructed by integrating the steady conservation laws—not by differentiating interpolated concentrations. The relative species diffusivities remain fixed as <i>D</i><sub>*</sub> changes.</div>
-      </section>
+      <aside class="controls" aria-label="Dimensional model controls">
+        <div class="controls-header">
+          <div class="controls-heading"><h2>Physical parameters</h2><p>Drag the sliders to explore</p></div>
+          <button type="button" class="controls-toggle" aria-controls="dim-control-fields" aria-expanded="true">Hide controls</button>
+        </div>
+        <div class="controls-fields" id="dim-control-fields">
+          <div class="control">
+            <div class="control-top"><label for="c0">Reservoir concentration <i>c</i>₀</label><output id="c0-value">1.00 mol/m³</output></div>
+            <input type="range" id="c0" min="0.05" max="2" step="0.01" value="1">
+          </div>
+          <div class="control">
+            <div class="control-top"><label for="cs">Salt concentration <i>c</i>ₛ</label><output id="cs-value">0.20 mol/m³</output></div>
+            <input type="range" id="cs" min="0.05" max="2" step="0.01" value="0.2">
+          </div>
+          <div class="control">
+            <div class="control-top"><label for="logL">Domain length <i>L</i></label><output id="logL-value">501 μm</output></div>
+            <input type="range" id="logL" min="-9" max="0" step="0.05" value="-3.30">
+            <div class="endpoints"><span>1 nm</span><span>1 m</span></div>
+          </div>
+          <div class="control">
+            <div class="control-top"><label for="logk">Reaction constant <i>k</i></label><output id="logk-value">1.00 × 10⁴</output></div>
+            <input type="range" id="logk" min="-12.25" max="10" step="0.25" value="4">
+            <div class="endpoints"><span>0</span><span>10¹⁰ m³/(mol·s)</span></div>
+          </div>
+          <div class="control">
+            <div class="control-top"><label for="logD">Characteristic diffusivity <i>D</i><sub>*</sub></label><output id="logD-value">9.33 × 10⁻⁹ m²/s</output></div>
+            <input type="range" id="logD" min="-9" max="-1" step="0.05" value="-8.03">
+            <div class="endpoints"><span>10⁻⁹</span><span>10⁻¹ m²/s</span></div>
+          </div>
+          <button type="button" class="reset-btn" id="reset-dimensional">↺ &nbsp; Reset parameters</button>
+          <details class="method-details">
+            <summary>About these numerical results</summary>
+            <p>Concentrations are interpolated from precomputed SciPy boundary-value solutions. Signed fluxes are reconstructed using steady conservation and the Nernst–Planck relations. The relative species diffusivities remain fixed as <i>D</i><sub>*</sub> changes.</p>
+          </details>
+        </div>
+      </aside>
+
       <section class="charts" aria-label="Dimensional plots">
-        <div class="statrow"><div><span class="stat-label">Damköhler number</span><strong id="stat-da">—</strong></div><div><span class="stat-label">Salt ratio cₛ/c₀</span><strong id="stat-gamma">—</strong></div><div><span class="stat-label">Reaction front</span><strong id="stat-peak">—</strong></div></div>
+        <div class="statrow" aria-label="Derived model quantities">
+          <div class="stat"><span class="stat-label">Damköhler number</span><strong id="stat-da">—</strong></div>
+          <div class="stat"><span class="stat-label">Salt ratio cₛ/c₀</span><strong id="stat-gamma">—</strong></div>
+          <div class="stat"><span class="stat-label">Reaction front</span><strong id="stat-peak">—</strong></div>
+        </div>
         <div class="chart-toolbar" role="group" aria-label="Select dimensional plots">
+          <span class="toolbar-label">SHOW</span>
           <button type="button" class="plot-choice selected" data-focus="all" aria-pressed="true">All plots</button>
           <button type="button" class="plot-choice" data-focus="concentration" aria-pressed="false">Concentration</button>
           <button type="button" class="plot-choice" data-focus="flux" aria-pressed="false">Flux</button>
           <button type="button" class="plot-choice" data-focus="reaction" aria-pressed="false">Reaction</button>
         </div>
-        <div class="chart" data-plot="concentration"><div class="chart-heading"><h3>Ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div><canvas id="dim-concentration" aria-label="Dimensional concentration curves"></canvas></div>
-        <div class="chart" data-plot="flux">
-          <div class="chart-heading"><h3>Species molar fluxes</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
-          <canvas id="dim-flux" role="img" aria-label="Signed dimensional molar flux profiles"></canvas>
-          <p class="chart-footnote">Positive flux points toward increasing <i>x</i>; negative flux points toward decreasing <i>x</i>. Na⁺ and Cl⁻ fluxes are spatially constant.</p>
+        <div class="plot-stack">
+          <article class="chart" data-plot="concentration">
+            <div class="chart-heading"><h3>Ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
+            <canvas id="dim-concentration" role="img" aria-label="Dimensional concentration curves"></canvas>
+          </article>
+          <article class="chart" data-plot="flux">
+            <div class="chart-heading"><h3>Species molar fluxes</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
+            <canvas id="dim-flux" role="img" aria-label="Signed dimensional molar flux profiles"></canvas>
+            <p class="chart-footnote">Positive flux: +x direction. Na⁺ and Cl⁻ fluxes are spatially constant.</p>
+          </article>
+          <article class="chart" data-plot="reaction">
+            <div class="chart-heading"><h3>Volumetric reaction rate</h3><div class="reaction-legend"><i class="swatch magenta"></i>R = kcₕcₒₕ</div></div>
+            <canvas id="dim-reaction" role="img" aria-label="Dimensional reaction rate curve"></canvas>
+          </article>
         </div>
-        <div class="chart" data-plot="reaction"><div class="chart-heading"><h3>Volumetric reaction rate</h3><span class="reaction-legend"><i class="swatch magenta"></i>R = kcₕcₒₕ</span></div><canvas id="dim-reaction" aria-label="Dimensional reaction-rate curve"></canvas></div>
       </section>
     </div>
 
+    <!-- NONDIMENSIONAL: same drawing logic and numerical datasets. -->
     <div id="panel-da" class="panel" role="tabpanel" aria-labelledby="tab-da" hidden>
-      <section class="controls" aria-label="Damköhler-only controls">
-        <div class="section-title">Nondimensional parameter <span class="section-subtitle">Drag to explore</span></div>
-        <button type="button" class="controls-toggle" aria-expanded="true">Hide sliders</button>
-        <div class="control"><div class="control-top"><label for="logDa">Damköhler number <i>Da</i></label><output id="logDa-value">100</output></div><input type="range" id="logDa" min="-6" max="10" step="0.05" value="2"><div class="endpoints"><span>10⁻⁶</span><span>10¹⁰</span></div></div>
-        <button type="button" class="reset-btn" id="reset-da">Reset Da</button>
-        <div class="method-notes">Each slider step retrieves an individually solved BVP concentration profile. Fluxes are recovered from steady conservation and boundary constraints.</div>
-      </section>
+      <aside class="controls" aria-label="Damköhler-only controls">
+        <div class="controls-header">
+          <div class="controls-heading"><h2>Nondimensional parameter</h2><p>Drag to explore</p></div>
+          <button type="button" class="controls-toggle" aria-controls="da-control-fields" aria-expanded="true">Hide controls</button>
+        </div>
+        <div class="controls-fields" id="da-control-fields">
+          <div class="control">
+            <div class="control-top"><label for="logDa">Damköhler number <i>Da</i></label><output id="logDa-value">100</output></div>
+            <input type="range" id="logDa" min="-6" max="10" step="0.05" value="2">
+            <div class="endpoints"><span>10⁻⁶</span><span>10¹⁰</span></div>
+          </div>
+          <button type="button" class="reset-btn" id="reset-da">↺ &nbsp; Reset Damköhler number</button>
+          <details class="method-details">
+            <summary>About these numerical results</summary>
+            <p>Each step retrieves a precomputed BVP concentration profile; signed fluxes are reconstructed using steady conservation and boundary constraints.</p>
+          </details>
+        </div>
+      </aside>
+
       <section class="charts" aria-label="Nondimensional plots">
-        <div class="statrow"><div><span class="stat-label">Damköhler number</span><strong id="stat-da-only">—</strong></div><div><span class="stat-label">Salt ratio cₛ/c₀</span><strong>0.2</strong></div><div><span class="stat-label">Reaction front</span><strong id="stat-da-peak">—</strong></div></div>
+        <div class="statrow" aria-label="Derived model quantities">
+          <div class="stat"><span class="stat-label">Damköhler number</span><strong id="stat-da-only">—</strong></div>
+          <div class="stat"><span class="stat-label">Salt ratio cₛ/c₀</span><strong>0.2</strong></div>
+          <div class="stat"><span class="stat-label">Reaction front</span><strong id="stat-da-peak">—</strong></div>
+        </div>
         <div class="chart-toolbar" role="group" aria-label="Select nondimensional plots">
+          <span class="toolbar-label">SHOW</span>
           <button type="button" class="plot-choice selected" data-focus="all" aria-pressed="true">All plots</button>
           <button type="button" class="plot-choice" data-focus="concentration" aria-pressed="false">Concentration</button>
           <button type="button" class="plot-choice" data-focus="flux" aria-pressed="false">Flux</button>
           <button type="button" class="plot-choice" data-focus="reaction" aria-pressed="false">Reaction</button>
         </div>
-        <div class="chart" data-plot="concentration"><div class="chart-heading"><h3>Dimensionless ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div><canvas id="da-concentration" aria-label="Nondimensional concentration curves"></canvas></div>
-        <div class="chart" data-plot="flux">
-          <div class="chart-heading"><h3>Dimensionless molar fluxes</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
-          <canvas id="da-flux" role="img" aria-label="Signed nondimensional species flux profiles"></canvas>
-          <p class="chart-footnote">The signed fluxes satisfy zero current, and the reactive-species flux gradients equal −R̂.</p>
+        <div class="plot-stack">
+          <article class="chart" data-plot="concentration">
+            <div class="chart-heading"><h3>Dimensionless ionic concentrations</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
+            <canvas id="da-concentration" role="img" aria-label="Dimensionless concentration curves"></canvas>
+          </article>
+          <article class="chart" data-plot="flux">
+            <div class="chart-heading"><h3>Dimensionless molar fluxes</h3><div class="legend"><span><i class="swatch red"></i>H⁺</span><span><i class="swatch orange"></i>Na⁺</span><span><i class="swatch blue"></i>OH⁻</span><span><i class="swatch green"></i>Cl⁻</span></div></div>
+            <canvas id="da-flux" role="img" aria-label="Signed dimensionless flux profiles"></canvas>
+            <p class="chart-footnote">Zero total current; reactive-species flux gradients equal −R̂.</p>
+          </article>
+          <article class="chart" data-plot="reaction">
+            <div class="chart-heading"><h3>Dimensionless reaction rate</h3><div class="reaction-legend"><i class="swatch magenta"></i>R̂ = Da ĈₕĈₒₕ</div></div>
+            <canvas id="da-reaction" role="img" aria-label="Dimensionless reaction rate curve"></canvas>
+          </article>
         </div>
-        <div class="chart" data-plot="reaction"><div class="chart-heading"><h3>Dimensionless reaction rate</h3><span class="reaction-legend"><i class="swatch magenta"></i>R̂ = Da ĈₕĈₒₕ</span></div><canvas id="da-reaction" aria-label="Nondimensional reaction-rate curve"></canvas></div>
       </section>
     </div>
 
-    <footer><span>Steady, 1D, zero-current electroneutral transport · Educational illustration</span><span>Precomputed with SciPy · flux reconstruction runs locally in your browser</span></footer>
+    <footer class="site-footer">
+      <span>Steady, one-dimensional, zero-current electroneutral transport</span>
+      <span>Numerical demonstration · SciPy BVP snapshots</span>
+    </footer>
   </main>
 </body>
 </html>

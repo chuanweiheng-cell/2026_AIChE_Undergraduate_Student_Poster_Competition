@@ -361,7 +361,9 @@ function setPlotFocus(panel,focus){
   for(const chart of panel.querySelectorAll('.chart[data-plot]')){
     chart.hidden=focus!=='all' && chart.dataset.plot!==focus;
   }
-  enqueueRender();
+  // The numerical state is unchanged; only a differently sized canvas needs repainting.
+  if (state.currentView==='dimensional') renderDimensional();
+  else renderDa();
 }
 
 function enqueueRender(){
@@ -398,19 +400,33 @@ async function boot(){
   $('tab-da').addEventListener('click',()=>activate('da'));
   $('reset-dimensional').addEventListener('click',restoreDimensional);
   $('reset-da').addEventListener('click',restoreDa);
+  const compactControls=window.matchMedia('(max-width: 900px)').matches;
+  const phone=window.matchMedia('(max-width: 620px)').matches;
   for(const button of document.querySelectorAll('.controls-toggle')){
-    button.addEventListener('click',()=>{
-      const section=button.closest('.controls');
-      const collapsed=section.classList.toggle('collapsed');
-      button.textContent=collapsed?'Show sliders':'Hide sliders';
+    const section=button.closest('.controls');
+    if(compactControls) section.classList.add('collapsed');
+    function updateToggle(){
+      const collapsed=section.classList.contains('collapsed');
+      button.textContent=collapsed?'Adjust parameters':'Hide controls';
       button.setAttribute('aria-expanded',collapsed?'false':'true');
-      enqueueRender();
+    }
+    updateToggle();
+    button.addEventListener('click',()=>{
+      section.classList.toggle('collapsed');
+      updateToggle();
+      if(state.currentView==='dimensional') renderDimensional();
+      else renderDa();
     });
   }
   for(const button of document.querySelectorAll('.plot-choice')){
     button.addEventListener('click',()=>setPlotFocus(button.closest('.panel'),button.dataset.focus));
   }
-  window.addEventListener('resize',enqueueRender);
+  // On phones default to one legible plot; "All plots" is still one tap away.
+  if(phone) for(const panel of document.querySelectorAll('.panel')) setPlotFocus(panel,'concentration');
+  window.addEventListener('resize',()=>{
+    if(state.currentView==='dimensional') renderDimensional();
+    else renderDa();
+  });
   const status=$('load-status');
   try{
     const resp=await fetch('manifest.json');
