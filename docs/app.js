@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 const COLORS = ['#FF3A3A', '#F77A13', '#3E07F4', '#0DB51E'];
 const REACTION_COLOR = '#B60C86';
-const state = { data: {}, currentView: 'dimensional', last: {}, scheduled: false };
+const state = { data: {}, currentView: 'dimensional', last: {}, scheduled: false, drel: null };
 const dimInputs = ['c0', 'cs', 'logL', 'logk', 'logD'];
 
 function clamp(v, low, high) { return Math.max(low, Math.min(high, v)); }
@@ -145,57 +145,155 @@ function chooseUnit(L) {
   return [1,'m'];
 }
 
-function paint(canvasId, data, title, mode) {
-  // Canvas rendering is intentionally independent of browser plotting libraries.
-  // The same normalized spatial grid is used on both stacked panels.
-  const canvas=$(canvasId);
-  const rect=canvas.getBoundingClientRect();
-  if (rect.width<1) return;
-  const DPR=Math.min(window.devicePixelRatio||1,2);
+// Recover fluxes without differentiating concentration profiles.
+// Conservation: J_H(x)=h0-I(x), J_OH(x)=o0-I(x), J_Na=n0,
+// J_Cl=h0+n0-o0, where I(x)=integral_0^x Da*C_H*C_OH dx.
+// The three unknown inlet fluxes are determined from integrated Nernst–Planck
+// concentration balances and the electroneutral zero-current field closure.
+// This reproduces the original BVP fluxes on tabulated snapshots, with a
+// small quadrature error; off-grid results inherit concentration interpolation.
+function solve3(A, b) {
+  const m = A.map((row, i) => [...row, b[i]]);
+  for (let k=0; k<3; k++) {
+    let pivot=k;
+    for (let i=k+1; i<3; i++) if (Math.abs(m[i][k]) > Math.abs(m[pivot][k])) pivot=i;
+    if (Math.abs(m[pivot][k]) < 1e-13) throw new Error('Flux reconstruction matrix is singular.');
+    [m[k],m[pivot]]=[m[pivot],m[k]];
+    for (let i=k+1; i<3; i++) {
+      const fac=m[i][k]/m[k][k];
+      for (let j=k; j<4; j++) m[i][j]-=fac*m[k][j];
+    }
+  }
+  const z=[0,0,0];
+  for (let k=2; k>=0; k--) {
+    let val=m[k][3];
+    for (let j=k+1; j<3; j++) val-=m[k][j]*z[j];
+    z[k]=val/m[k][k];
+  }
+  return z;
+}
+
+function recoverFlux(x, c, Da) {
+  const [h, na, oh] = c, n=x.length;
+  if (!state.drel || n<2) throw new Error('Missing diffusivity ratios or numerical grid.');
+  const [dH,dNa,dOH,dCl] = state.drel;
+  const I=new Float64Array(n), rate=new Float64Array(n);
+  for (let k=0; k<n; k++) rate[k]=Da*Math.max(0,h[k])*Math.max(0,oh[k]);
+  for (let k=1; k<n; k++) {
+    const dx=x[k]-x[k-1];
+    I[k]=I[k-1]+0.5*dx*(rate[k-1]+rate[k]);
+  }
+
+  let qH=0,qNa=0,qOH=0,qHI=0,qNaI=0,qOHI=0,intI=0;
+  for (let k=1; k<n; k++) {
+    const dx=0.5*(x[k]-x[k-1]);
+    const den0=2*Math.max(h[k-1]+na[k-1],1e-16);
+    const den1=2*Math.max(h[k]+na[k],1e-16);
+    const a=h[k-1]/den0, b=h[k]/den1;
+    const e=na[k-1]/den0, f=na[k]/den1;
+    const g=oh[k-1]/den0, t=oh[k]/den1;
+    qH+=dx*(a+b); qNa+=dx*(e+f); qOH+=dx*(g+t);
+    qHI+=dx*(a*I[k-1]+b*I[k]);
+    qNaI+=dx*(e*I[k-1]+f*I[k]);
+    qOHI+=dx*(g*I[k-1]+t*I[k]);
+    intI+=dx*(I[k-1]+I[k]);
+  }
+
+  // E=[a*J_H+b*J_Na+c*J_OH+e*I] / [2(C_H+C_Na)]
+  // with J_Cl=J_H+J_Na-J_OH, and J_H=h0-I, J_OH=o0-I.
+  const a=1/dH-1/dCl, b=1/dNa-1/dCl;
+  const cc=-1/dOH+1/dCl, e=-1/dH+1/dOH;
+  const A=[
+    [a*qH-1/dH, b*qH, cc*qH],
+    [a*qNa, b*qNa-1/dNa, cc*qNa],
+    [-a*qOH, -b*qOH, -cc*qOH-1/dOH]
+  ];
+  const rhs=[
+    h[n-1]-h[0]-e*qHI-intI/dH,
+    na[n-1]-na[0]-e*qNaI,
+    oh[n-1]-oh[0]+e*qOHI-intI/dOH
+  ];
+  const [h0,n0,o0]=solve3(A,rhs);
+  const flux=[new Float64Array(n),new Float64Array(n),new Float64Array(n),new Float64Array(n)];
+  const cl0=h0+n0-o0;
+  for (let k=0; k<n; k++) {
+    flux[0][k]=h0-I[k];flux[1][k]=n0;
+    flux[2][k]=o0-I[k];flux[3][k]=cl0;
+  }
+  return flux;
+}
+
+function paint(canvasId,data) {
+  // Signed fluxes use a y-axis that includes negative and positive values.
+  const canvas=$(canvasId),rect=canvas.getBoundingClientRect();
+  if (rect.width<1 || rect.height<1) return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
   const W=rect.width,H=rect.height;
-  if(canvas.width!==Math.round(W*DPR)||canvas.height!==Math.round(H*DPR)){
-    canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  if (canvas.width!==Math.round(W*dpr) || canvas.height!==Math.round(H*dpr)) {
+    canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
   }
   const ctx=canvas.getContext('2d');
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-  ctx.clearRect(0,0,W,H);
-  const left=W<470?65:79,right=15,top=13,bottom=39;
-  const px=left,py=top,pw=Math.max(50,W-left-right),ph=Math.max(50,H-top-bottom);
-  let ymax=1e-12;
-  for(const curve of data.ys) for(let k=0;k<curve.length;k++) if(Number.isFinite(curve[k])&&curve[k]>ymax) ymax=curve[k];
-  ymax*=1.15;
-  ctx.font='11px system-ui, sans-serif';ctx.fillStyle='#536c78';ctx.textAlign='right';ctx.textBaseline='middle';
-  for(let j=0;j<=4;j++){
-    const yy=py+ph*(1-j/4);
-    ctx.beginPath();ctx.strokeStyle='#e3e9eb';ctx.lineWidth=1;ctx.moveTo(px,yy);ctx.lineTo(px+pw,yy);ctx.stroke();
-    ctx.fillText(nice(ymax*j/4,3),px-7,yy);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  let rawMin=Infinity,rawMax=-Infinity;
+  for(const curve of data.ys) for(let i=0;i<curve.length;i++) {
+    if(Number.isFinite(curve[i])){
+      rawMin=Math.min(rawMin,curve[i]);rawMax=Math.max(rawMax,curve[i]);
+    }
+  }
+  if (!Number.isFinite(rawMin)) {rawMin=0;rawMax=1;}
+  const magnitude=Math.max(Math.abs(rawMin),Math.abs(rawMax),1e-12);
+  const yMin=data.signed ? Math.min(rawMin,0)-0.08*magnitude : 0;
+  const yMax=data.signed ? Math.max(rawMax,0)+0.08*magnitude : Math.max(rawMax*1.14,1e-12);
+  const ticks=Array.from({length:5},(_,i)=>yMin+(yMax-yMin)*i/4);
+  const fs=W<420?10:11;
+  ctx.font=`${fs}px system-ui, sans-serif`;
+  const tickWidth=Math.max(...ticks.map(v=>ctx.measureText(nice(Math.abs(v)<magnitude*1e-11?0:v,3)).width));
+  const left=Math.max(58,Math.min(110,Math.ceil(tickWidth)+28));
+  const right=W<400?8:15,top=14,bottom=37;
+  const px=left,py=top,pw=Math.max(30,W-left-right),ph=Math.max(35,H-top-bottom);
+  ctx.fillStyle='#536c78';ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let i=0;i<5;i++){
+    const val=ticks[i],yy=py+ph*(1-i/4);
+    ctx.beginPath();ctx.strokeStyle=Math.abs(val)<1e-10*magnitude&&data.signed?'#a8b9be':'#e3e9eb';
+    ctx.lineWidth=(Math.abs(val)<1e-10*magnitude&&data.signed)?1.4:1;
+    ctx.moveTo(px,yy);ctx.lineTo(px+pw,yy);ctx.stroke();
+    ctx.fillStyle='#536c78';ctx.fillText(nice(Math.abs(val)<magnitude*1e-11?0:val,3),px-7,yy);
+  }
+  if(data.signed && yMin<0 && yMax>0){
+    const y0=py+ph*(yMax/(yMax-yMin));
+    ctx.beginPath();ctx.strokeStyle='#8499a2';ctx.lineWidth=1.4;
+    ctx.moveTo(px,y0);ctx.lineTo(px+pw,y0);ctx.stroke();
   }
   ctx.textAlign='center';ctx.textBaseline='top';
-  for(let j=0;j<=4;j++){
-    const xx=px+pw*j/4;
-    ctx.beginPath();ctx.strokeStyle='#edf0f1';ctx.moveTo(xx,py);ctx.lineTo(xx,py+ph);ctx.stroke();
-    ctx.fillStyle='#536c78';ctx.fillText(nice(data.xMax*j/4,3),xx,py+ph+7);
+  for(let i=0;i<=4;i++){
+    const xx=px+pw*i/4;
+    ctx.beginPath();ctx.strokeStyle='#edf0f1';ctx.lineWidth=1;
+    ctx.moveTo(xx,py);ctx.lineTo(xx,py+ph);ctx.stroke();
+    ctx.fillStyle='#536c78';ctx.fillText(nice(data.xMax*i/4,3),xx,py+ph+7);
   }
   ctx.strokeStyle='#8fa2aa';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px,py+ph);ctx.lineTo(px+pw,py+ph);ctx.stroke();
-  ctx.save();ctx.translate(W<470?12:16,py+ph/2);ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#526a76';ctx.font='11px system-ui';ctx.fillText(data.yLabel,0,0);ctx.restore();
-  ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillStyle='#526a76';ctx.fillText(data.xLabel,px+pw/2,H-2);
+  ctx.save();ctx.translate(13,py+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#526a76';ctx.font=`${fs}px system-ui`;
+  ctx.fillText(data.yLabel,0,0);ctx.restore();
+  ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillStyle='#526a76';
+  ctx.fillText(data.xLabel,px+pw/2,H-2);
   ctx.save();ctx.beginPath();ctx.rect(px,py,pw,ph);ctx.clip();
   for(let s=0;s<data.ys.length;s++){
-    const yy=data.ys[s],color=data.colors[s];
-    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2.2;ctx.lineJoin='round';
-    const xarr=data.x;
-    for(let k=0;k<xarr.length;k++){
-      const xp=px+pw*xarr[k];
-      const yp=py+ph*(1-clamp(yy[k]/ymax,0,1));
-      if(k===0)ctx.moveTo(xp,yp);else ctx.lineTo(xp,yp);
+    const curve=data.ys[s];ctx.beginPath();
+    ctx.strokeStyle=data.colors[s];ctx.lineWidth=W<420?2:2.3;ctx.lineJoin='round';
+    for(let k=0;k<data.x.length;k++){
+      const vx=data.x[k],vy=curve[k];
+      if(!Number.isFinite(vy))continue;
+      const cx=px+pw*vx,cy=py+ph*(yMax-vy)/(yMax-yMin);
+      if(k===0)ctx.moveTo(cx,cy);else ctx.lineTo(cx,cy);
     }
     ctx.stroke();
   }
   if(data.peak!==undefined && data.peakR>0){
-    ctx.beginPath();ctx.setLineDash([4,4]);ctx.lineWidth=1;ctx.strokeStyle='#7a8c94';
-    ctx.moveTo(px+pw*data.peak,py);ctx.lineTo(px+pw*data.peak,py+ph);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.setLineDash([4,4]);ctx.lineWidth=1;ctx.strokeStyle='#738b95';
+    ctx.moveTo(px+pw*data.peak,py);ctx.lineTo(px+pw*data.peak,py+ph);
+    ctx.stroke();ctx.setLineDash([]);
   }
   ctx.restore();
 }
@@ -209,6 +307,7 @@ function drawDimensional() {
   $('logk-value').textContent=sci(v.k);
   $('logD-value').textContent=sci(v.dstar)+' m²/s';
   const p=dimensionalProfile(v.Da,v.gamma);
+  const J=recoverFlux(p.x,p.c,v.Da).map(curve=>Float64Array.from(curve,a=>a*v.dstar*v.c0/v.L));
   const c=p.c.map(arr=>Float64Array.from(arr,a=>a*v.c0));
   const r=new Float64Array(p.x.length);
   let peakR=0,peak=0;
@@ -216,7 +315,7 @@ function drawDimensional() {
     r[j]=v.k*c[0][j]*c[2][j];
     if(r[j]>peakR){peakR=r[j];peak=p.x[j];}
   }
-  state.last.dimensional={x:p.x,c,r,peak,peakR,values:v,mul,unit};
+  state.last.dimensional={x:p.x,c,J,r,peak,peakR,values:v,mul,unit};
   $('stat-da').textContent=nice(v.Da,4);
   $('stat-gamma').textContent=nice(v.gamma,4);
   $('stat-peak').textContent=peakR?nice(peak*v.L*mul,4)+' '+unit:'No reaction';
@@ -226,6 +325,7 @@ function renderDimensional(){
   const d=state.last.dimensional;if(!d)return;
   const xMax=d.values.L*d.mul;
   paint('dim-concentration',{x:d.x,ys:d.c,colors:COLORS,xMax,xLabel:`x (${d.unit})`,yLabel:'cᵢ (mol/m³)'},'Concentration','dimensional');
+  paint('dim-flux',{x:d.x,ys:d.J,colors:COLORS,xMax,xLabel:`x (${d.unit})`,yLabel:'jᵢ (mol/(m² s))',signed:true,peak:d.peak,peakR:d.peakR});
   paint('dim-reaction',{x:d.x,ys:[d.r],colors:[REACTION_COLOR],xMax,xLabel:`x (${d.unit})`,yLabel:'R (mol/(m³·s))',peak:d.peak,peakR:d.peakR},'Reaction','dimensional');
 }
 function drawDa(){
@@ -238,7 +338,8 @@ function drawDa(){
     r[j]=p.Da*Math.max(p.c[0][j],0)*Math.max(p.c[2][j],0);
     if(r[j]>peakR){peakR=r[j];peak=p.x[j];}
   }
-  state.last.da={x:p.x,c:p.c,r,peak,peakR};
+  const J=recoverFlux(p.x,p.c,p.Da);
+  state.last.da={x:p.x,c:p.c,J,r,peak,peakR};
   $('stat-da-only').textContent=nice(p.Da,4);
   $('stat-da-peak').textContent=nice(peak,4);
   renderDa();
@@ -246,7 +347,21 @@ function drawDa(){
 function renderDa(){
   const d=state.last.da;if(!d)return;
   paint('da-concentration',{x:d.x,ys:d.c,colors:COLORS,xMax:1,xLabel:'x̂',yLabel:'Ĉᵢ'},'Concentrations','da');
+  paint('da-flux',{x:d.x,ys:d.J,colors:COLORS,xMax:1,xLabel:'x̂',yLabel:'Ĵᵢ',signed:true,peak:d.peak,peakR:d.peakR});
   paint('da-reaction',{x:d.x,ys:[d.r],colors:[REACTION_COLOR],xMax:1,xLabel:'x̂',yLabel:'R̂',peak:d.peak,peakR:d.peakR},'Reaction','da');
+}
+
+function setPlotFocus(panel,focus){
+  panel.classList.toggle('focus-single',focus!=='all');
+  for(const button of panel.querySelectorAll('.plot-choice')){
+    const selected=button.dataset.focus===focus;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',selected?'true':'false');
+  }
+  for(const chart of panel.querySelectorAll('.chart[data-plot]')){
+    chart.hidden=focus!=='all' && chart.dataset.plot!==focus;
+  }
+  enqueueRender();
 }
 
 function enqueueRender(){
@@ -283,6 +398,18 @@ async function boot(){
   $('tab-da').addEventListener('click',()=>activate('da'));
   $('reset-dimensional').addEventListener('click',restoreDimensional);
   $('reset-da').addEventListener('click',restoreDa);
+  for(const button of document.querySelectorAll('.controls-toggle')){
+    button.addEventListener('click',()=>{
+      const section=button.closest('.controls');
+      const collapsed=section.classList.toggle('collapsed');
+      button.textContent=collapsed?'Show sliders':'Hide sliders';
+      button.setAttribute('aria-expanded',collapsed?'false':'true');
+      enqueueRender();
+    });
+  }
+  for(const button of document.querySelectorAll('.plot-choice')){
+    button.addEventListener('click',()=>setPlotFocus(button.closest('.panel'),button.dataset.focus));
+  }
   window.addEventListener('resize',enqueueRender);
   const status=$('load-status');
   try{
@@ -290,6 +417,7 @@ async function boot(){
     if(!resp.ok)throw new Error('Could not read manifest.json');
     const manifest=await resp.json();
     if(manifest.version!==1)throw new Error('Incompatible data version');
+    state.drel=manifest.dimensional.relative_diffusivities;
     status.textContent='Loading 321 Da profiles…';
     state.data.da=await loadTable(manifest.da);
     // The smaller table is loaded first. Both modes load from the site itself.
